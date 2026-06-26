@@ -16,22 +16,76 @@ import {
 import { getStoredTasks, saveTasks } from "@/services/task-storage";
 import type { Task } from "@/types/task";
 
+const TITLE_MIN_LENGTH = 3;
+const TITLE_MAX_LENGTH = 50;
+const DESCRIPTION_MIN_LENGTH = 5;
+const DESCRIPTION_MAX_LENGTH = 300;
+
+const getTitleError = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return "Title is required.";
+  }
+
+  if (trimmedValue.length < TITLE_MIN_LENGTH) {
+    return `Title must be at least ${TITLE_MIN_LENGTH} characters.`;
+  }
+
+  if (trimmedValue.length > TITLE_MAX_LENGTH) {
+    return `Title must be no more than ${TITLE_MAX_LENGTH} characters.`;
+  }
+
+  return "";
+};
+
+const getDescriptionError = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return "Description is required.";
+  }
+
+  if (trimmedValue.length < DESCRIPTION_MIN_LENGTH) {
+    return `Description must be at least ${DESCRIPTION_MIN_LENGTH} characters.`;
+  }
+
+  if (trimmedValue.length > DESCRIPTION_MAX_LENGTH) {
+    return `Description must be no more than ${DESCRIPTION_MAX_LENGTH} characters.`;
+  }
+
+  return "";
+};
+
 export default function NewTaskScreen() {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [descriptionTouched, setDescriptionTouched] = useState(false);
 
-  const isValid = useMemo(
-    () => title.trim().length >= 3 && description.trim().length >= 5,
-    [title, description],
+  const titleError = useMemo(() => getTitleError(title), [title]);
+  const descriptionError = useMemo(
+    () => getDescriptionError(description),
+    [description],
   );
 
+  const isValid = !titleError && !descriptionError;
+
   const handleCreate = async () => {
-    if (!isValid) {
+    const titleValue = title.trim();
+    const descriptionValue = description.trim();
+    const nextTitleError = getTitleError(titleValue);
+    const nextDescriptionError = getDescriptionError(descriptionValue);
+
+    setTitleTouched(true);
+    setDescriptionTouched(true);
+
+    if (nextTitleError || nextDescriptionError) {
       Alert.alert(
         "Validation",
-        "Please enter a title (minimum 3 characters) and description (minimum 5 characters).",
+        [nextTitleError, nextDescriptionError].filter(Boolean).join("\n"),
       );
       return;
     }
@@ -40,8 +94,8 @@ export default function NewTaskScreen() {
 
     const task: Task = {
       id: Date.now().toString(),
-      title: title.trim(),
-      description: description.trim(),
+      title: titleValue,
+      description: descriptionValue,
       status: "pending",
       createdAt: new Date().toISOString(),
     };
@@ -73,26 +127,55 @@ export default function NewTaskScreen() {
 
             <TextInput
               value={title}
-              onChangeText={setTitle}
+              onChangeText={(value) => {
+                setTitle(value);
+                if (!titleTouched) {
+                  setTitleTouched(true);
+                }
+              }}
+              onBlur={() => setTitleTouched(true)}
               placeholder="Enter task title"
               placeholderTextColor="#94a3b8"
-              style={styles.input}
+              style={[
+                styles.input,
+                titleTouched && titleError ? styles.inputError : null,
+              ]}
               autoCapitalize="sentences"
+              maxLength={TITLE_MAX_LENGTH}
               returnKeyType="next"
             />
+            {titleTouched && titleError ? (
+              <Text style={styles.errorText}>{titleError}</Text>
+            ) : null}
 
             <Text style={styles.label}>Description</Text>
 
             <TextInput
               value={description}
-              onChangeText={setDescription}
+              onChangeText={(value) => {
+                setDescription(value);
+                if (!descriptionTouched) {
+                  setDescriptionTouched(true);
+                }
+              }}
+              onBlur={() => setDescriptionTouched(true)}
               placeholder="Enter task description"
               placeholderTextColor="#94a3b8"
               multiline
               numberOfLines={5}
               textAlignVertical="top"
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input,
+                styles.textArea,
+                descriptionTouched && descriptionError
+                  ? styles.inputError
+                  : null,
+              ]}
+              maxLength={DESCRIPTION_MAX_LENGTH}
             />
+            {descriptionTouched && descriptionError ? (
+              <Text style={styles.errorText}>{descriptionError}</Text>
+            ) : null}
           </View>
 
           <Pressable
@@ -158,6 +241,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: "#0f172a",
+  },
+
+  inputError: {
+    borderColor: "#dc2626",
+  },
+
+  errorText: {
+    color: "#dc2626",
+    fontSize: 13,
+    marginTop: -4,
   },
 
   textArea: {
